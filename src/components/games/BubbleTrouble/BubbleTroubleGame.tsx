@@ -10,6 +10,9 @@ import {
   resetGame,
 } from './gameLogic';
 import { renderGame } from './renderer';
+import { useGameScoring } from '@/hooks/useGameScoring';
+import ScoreDisplay from '@/components/game-ui/ScoreDisplay';
+import GameOverModal from '@/components/game-ui/GameOverModal';
 
 interface BubbleTroubleGameProps {
   width?: number;
@@ -30,6 +33,30 @@ export default function BubbleTroubleGame({
   const [dimensions, setDimensions] = useState({ 
     width: initialWidth || 800, 
     height: initialHeight || 600 
+  });
+
+  // Game scoring integration
+  const [showGameOver, setShowGameOver] = useState(false);
+  const [gameOverData, setGameOverData] = useState<{
+    score: number;
+    isHighScore: boolean;
+    isPersonalBest: boolean;
+    previousBest?: number;
+  } | null>(null);
+  const [personalBest, setPersonalBest] = useState<number | undefined>(undefined);
+
+  const {
+    startSession,
+    endSession,
+    updateScore,
+    getPersonalBest,
+    isSignedIn,
+    playerName
+  } = useGameScoring({
+    gameSlug: 'bubble-trouble',
+    onHighScore: (score, isPersonalBest) => {
+      console.log(`High score achieved: ${score}, Personal best: ${isPersonalBest}`);
+    }
   });
 
   // Handle responsive sizing - fullscreen with 20px padding
@@ -71,8 +98,21 @@ export default function BubbleTroubleGame({
       }
       lastShootRef.current = inputRef.current.shoot;
 
+      const previousState = { ...gameStateRef.current };
+      
       // Update game state
       gameStateRef.current = updateGameState(gameStateRef.current, input);
+
+      // Update score if it changed
+      if (gameStateRef.current.score !== previousState.score) {
+        updateScore(gameStateRef.current.score);
+      }
+
+      // Handle game over
+      if ((gameStateRef.current.status === 'gameOver' || gameStateRef.current.status === 'won') && 
+          previousState.status !== gameStateRef.current.status) {
+        handleGameOver(gameStateRef.current.score);
+      }
 
       // Render
       renderGame(ctx, gameStateRef.current);
@@ -87,7 +127,7 @@ export default function BubbleTroubleGame({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [dimensions]);
+  }, [dimensions, updateScore]);
 
   // Keyboard input
   useEffect(() => {
@@ -142,6 +182,40 @@ export default function BubbleTroubleGame({
     };
   }, []);
 
+  // Load personal best on mount
+  useEffect(() => {
+    const loadPersonalBest = async () => {
+      const pb = await getPersonalBest();
+      setPersonalBest(pb?.score);
+    };
+    loadPersonalBest();
+  }, [getPersonalBest]);
+
+  // Handle game over
+  const handleGameOver = useCallback(async (finalScore: number) => {
+    const result = await endSession(finalScore);
+    setGameOverData({
+      score: finalScore,
+      isHighScore: result.isHighScore,
+      isPersonalBest: result.isPersonalBest,
+      previousBest: result.previousBest || personalBest
+    });
+    setShowGameOver(true);
+    
+    // Update personal best if needed
+    if (result.isPersonalBest) {
+      setPersonalBest(finalScore);
+    }
+  }, [endSession, personalBest]);
+
+  // Handle new game start
+  const handleNewGame = useCallback(() => {
+    startSession();
+    if (gameStateRef.current) {
+      gameStateRef.current = startLevel(resetGame(gameStateRef.current));
+    }
+  }, [startSession]);
+
   const handleAction = useCallback(() => {
     if (!gameStateRef.current) return;
 
@@ -149,7 +223,7 @@ export default function BubbleTroubleGame({
 
     switch (state.status) {
       case 'menu':
-        gameStateRef.current = startLevel(state);
+        handleNewGame();
         break;
       case 'playing':
         inputRef.current.shoot = true;
@@ -162,10 +236,10 @@ export default function BubbleTroubleGame({
         break;
       case 'gameOver':
       case 'won':
-        gameStateRef.current = startLevel(resetGame(state));
+        handleNewGame();
         break;
     }
-  }, []);
+  }, [handleNewGame]);
 
   // Touch input
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
@@ -243,6 +317,7 @@ export default function BubbleTroubleGame({
         padding: '20px',
         boxSizing: 'border-box',
         overflow: 'hidden',
+        position: 'relative',
       }}
     >
       <canvas
@@ -258,6 +333,96 @@ export default function BubbleTroubleGame({
           cursor: 'pointer',
         }}
       />
+
+      {/* Score Display */}
+      {gameStateRef.current && (gameStateRef.current.status === 'playing' || gameStateRef.current.status === 'paused') && (
+        <div 
+          style={{
+            position: 'absolute',
+            top: '30px',
+            left: '30px',
+            zIndex: 10,
+          }}
+        >
+          <ScoreDisplay 
+            score={gameStateRef.current.score}
+            personalBest={personalBest}
+            compact={true}
+          />
+        </div>
+      )}
+
+      {/* Game Status Overlay */}
+      {gameStateRef.current && gameStateRef.current.status !== 'playing' && !showGameOver && (
+        <div 
+          style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            textAlign: 'center',
+            color: 'var(--text-primary)',
+            backgroundColor: 'rgba(15, 15, 26, 0.9)',
+            padding: '20px',
+            borderRadius: '8px',
+            border: '1px solid var(--border)',
+            zIndex: 10,
+          }}
+        >
+          {gameStateRef.current.status === 'menu' && (
+            <>
+              <h2 style={{ fontSize: '24px', marginBottom: '10px', color: 'var(--accent-cyan)' }}>
+                BUBBLE TROUBLE
+              </h2>
+              <p style={{ fontSize: '14px', marginBottom: '15px', color: 'var(--text-muted)' }}>
+                {isSignedIn ? `Welcome back, ${playerName}!` : 'Pop bubbles to score points!'}
+              </p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                SPACE to start • WASD/Arrows to move • SPACE to shoot
+              </p>
+            </>
+          )}
+          
+          {gameStateRef.current.status === 'paused' && (
+            <>
+              <h2 style={{ fontSize: '24px', marginBottom: '10px', color: 'var(--accent-yellow)' }}>
+                PAUSED
+              </h2>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                ESC or SPACE to resume
+              </p>
+            </>
+          )}
+          
+          {gameStateRef.current.status === 'levelComplete' && (
+            <>
+              <h2 style={{ fontSize: '24px', marginBottom: '10px', color: 'var(--accent-green)' }}>
+                LEVEL {gameStateRef.current.level} COMPLETE!
+              </h2>
+              <p style={{ fontSize: '14px', marginBottom: '10px', color: 'var(--accent-cyan)' }}>
+                Score: {gameStateRef.current.score.toLocaleString()}
+              </p>
+              <p style={{ fontSize: '12px', color: 'var(--text-muted)' }}>
+                SPACE to continue
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Game Over Modal */}
+      {showGameOver && gameOverData && (
+        <GameOverModal
+          isOpen={showGameOver}
+          score={gameOverData.score}
+          isHighScore={gameOverData.isHighScore}
+          isPersonalBest={gameOverData.isPersonalBest}
+          previousBest={gameOverData.previousBest}
+          gameTitle="Bubble Trouble"
+          onPlayAgain={handleNewGame}
+          onClose={() => setShowGameOver(false)}
+        />
+      )}
     </div>
   );
 }
