@@ -32,19 +32,14 @@ export default function BubbleTroubleGame({
     height: initialHeight || 600 
   });
 
-  // Handle responsive sizing
+  // Handle responsive sizing - fullscreen with 20px padding
   useEffect(() => {
     const updateSize = () => {
-      if (containerRef.current) {
-        const container = containerRef.current;
-        const maxWidth = Math.min(container.clientWidth - 20, 800);
-        const aspectRatio = 4 / 3;
-        const maxHeight = Math.min(window.innerHeight - 100, maxWidth / aspectRatio);
-        const width = Math.min(maxWidth, maxHeight * aspectRatio);
-        const height = width / aspectRatio;
-        
-        setDimensions({ width: Math.floor(width), height: Math.floor(height) });
-      }
+      const padding = 20;
+      const width = window.innerWidth - (padding * 2);
+      const height = window.innerHeight - (padding * 2);
+      
+      setDimensions({ width: Math.floor(width), height: Math.floor(height) });
     };
 
     updateSize();
@@ -240,14 +235,14 @@ export default function BubbleTroubleGame({
       ref={containerRef}
       style={{
         display: 'flex',
-        flexDirection: 'column',
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%',
-        minHeight: '100vh',
+        width: '100vw',
+        height: '100vh',
         backgroundColor: '#0f0f1a',
-        padding: '10px',
+        padding: '20px',
         boxSizing: 'border-box',
+        overflow: 'hidden',
       }}
     >
       <canvas
@@ -259,31 +254,10 @@ export default function BubbleTroubleGame({
         onTouchMove={(e) => e.preventDefault()}
         onTouchEnd={handleTouchEnd}
         style={{
-          border: '3px solid #333',
-          borderRadius: '8px',
           touchAction: 'none',
-          maxWidth: '100%',
           cursor: 'pointer',
         }}
       />
-      
-      {/* Mobile controls hint */}
-      <div
-        style={{
-          marginTop: '15px',
-          color: '#666',
-          fontSize: '12px',
-          textAlign: 'center',
-          fontFamily: 'monospace',
-        }}
-      >
-        <p style={{ margin: '5px 0' }}>
-          Desktop: ← → or A/D to move, SPACE to shoot, ESC to pause
-        </p>
-        <p style={{ margin: '5px 0' }}>
-          Mobile: Touch left/right edges to move, center to shoot
-        </p>
-      </div>
     </div>
   );
 }
