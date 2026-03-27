@@ -41,17 +41,25 @@ export function useGameScoring({
     sessionRef.current = session
 
     // Record play session in database
-    if (user) {
+    if (!user) {
+      console.warn('[useGameScoring] startSession: no authed user, not recording play session')
+    } else {
       try {
-        await supabase
+        const { error } = await supabase
           .from('play_sessions')
           .insert({
             user_id: user.id,
             game_slug: gameSlug,
             played_at: new Date().toISOString()
           })
+
+        if (error) {
+          console.error('[useGameScoring] play_sessions insert error', error)
+        } else {
+          console.log('[useGameScoring] play_sessions insert ok')
+        }
       } catch (error) {
-        console.warn('Failed to record play session:', error)
+        console.warn('[useGameScoring] Failed to record play session (exception):', error)
       }
     }
 
@@ -80,7 +88,7 @@ export function useGameScoring({
       
       if (isPersonalBest) {
         // Save new high score (upsert)
-        await supabase
+        const { error: upsertError } = await supabase
           .from('high_scores')
           .upsert({
             user_id: user.id,
@@ -90,6 +98,10 @@ export function useGameScoring({
           }, {
             onConflict: 'user_id,game_slug'
           })
+
+        if (upsertError) {
+          console.error('[useGameScoring] high_scores upsert error', upsertError)
+        }
 
         // Check if it's a global high score
         const { data: topScores } = await supabase
