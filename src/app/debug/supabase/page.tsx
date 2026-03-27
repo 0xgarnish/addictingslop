@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 
 export default function SupabaseDebugPage() {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, lastProfileError, refreshProfile } = useAuth()
   const [env, setEnv] = useState({
     url: 'unknown',
     hasUrl: false,
@@ -32,6 +32,13 @@ export default function SupabaseDebugPage() {
         <div><b>auth loading:</b> {loading ? 'yes' : 'no'}</div>
         <div><b>user:</b> {user ? `${user.id} (${user.email})` : '(none)'}</div>
         <div><b>profile:</b> {profile ? profile.username : '(none)'} </div>
+        <div><b>lastProfileError:</b> {lastProfileError ?? '(none)'}</div>
+        <button
+          onClick={() => refreshProfile()}
+          className="mt-2 bg-white/10 hover:bg-white/15 border border-white/10 rounded px-3 py-1 text-xs"
+        >
+          Refresh profile
+        </button>
       </div>
 
       <p className="text-xs opacity-70 mt-4">

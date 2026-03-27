@@ -9,6 +9,8 @@ interface AuthContextType {
   profile: Profile | null
   session: Session | null
   loading: boolean
+  lastProfileError: string | null
+  refreshProfile: () => Promise<void>
   signUp: (email: string, password: string, username: string) => Promise<{ error: any }>
   signIn: (email: string, password: string) => Promise<{ error: any }>
   signOut: () => Promise<void>
@@ -22,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
+  const [lastProfileError, setLastProfileError] = useState<string | null>(null)
 
   useEffect(() => {
     // Skip auth setup if Supabase isn't configured
@@ -62,16 +65,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const fetchProfile = async (userId: string) => {
     try {
+      setLastProfileError(null)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
-      if (error) throw error
+      if (error) {
+        console.error('[auth] fetchProfile error:', error)
+        setLastProfileError(error.message ?? String(error))
+        setProfile(null)
+        return
+      }
+
+      if (!data) {
+        const msg = 'No profile row found for user'
+        console.warn('[auth] fetchProfile: ' + msg, { userId })
+        setLastProfileError(msg)
+        setProfile(null)
+        return
+      }
+
       setProfile(data)
-    } catch (error) {
-      console.error('Error fetching profile:', error)
+    } catch (error: any) {
+      console.error('[auth] fetchProfile exception:', error)
+      setLastProfileError(error?.message ?? String(error))
+      setProfile(null)
     }
   }
 
@@ -147,11 +167,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const refreshProfile = async () => {
+    if (!user) return
+    await fetchProfile(user.id)
+  }
+
   const value = {
     user,
     profile,
     session,
     loading,
+    lastProfileError,
+    refreshProfile,
     signUp,
     signIn,
     signOut,
