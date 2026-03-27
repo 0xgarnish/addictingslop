@@ -58,25 +58,6 @@ export function useGameScoring({
     return session
   }, [gameSlug, profile?.username, user])
 
-  // Update score during gameplay
-  const updateScore = useCallback((newScore: number) => {
-    if (!sessionRef.current) return
-
-    sessionRef.current.currentScore = newScore
-
-    // Auto-save progress if enabled and score increased significantly
-    if (autoSaveInterval > 0 && newScore > lastSavedScore.current + 100) {
-      if (autoSaveTimeoutRef.current) {
-        clearTimeout(autoSaveTimeoutRef.current)
-      }
-      
-      autoSaveTimeoutRef.current = setTimeout(() => {
-        saveScore(newScore, false) // Don't end session
-        lastSavedScore.current = newScore
-      }, autoSaveInterval)
-    }
-  }, [autoSaveInterval])
-
   // Save final score and check for high score
   const saveScore = useCallback(async (finalScore: number, endSession: boolean = true) => {
     if (!user || !sessionRef.current) {
@@ -106,6 +87,8 @@ export function useGameScoring({
             game_slug: gameSlug,
             score: finalScore,
             achieved_at: new Date().toISOString()
+          }, {
+            onConflict: 'user_id,game_slug'
           })
 
         // Check if it's a global high score
@@ -152,6 +135,25 @@ export function useGameScoring({
       return { saved: false, isHighScore: false, isPersonalBest: false }
     }
   }, [user, gameSlug, onHighScore])
+
+  // Update score during gameplay
+  const updateScore = useCallback((newScore: number) => {
+    if (!sessionRef.current) return
+
+    sessionRef.current.currentScore = newScore
+
+    // Auto-save progress if enabled and score increased (don’t require game over)
+    if (autoSaveInterval > 0 && newScore > lastSavedScore.current) {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current)
+      }
+
+      autoSaveTimeoutRef.current = setTimeout(() => {
+        saveScore(newScore, false) // Don't end session
+        lastSavedScore.current = newScore
+      }, autoSaveInterval)
+    }
+  }, [autoSaveInterval, saveScore])
 
   // End current session
   const endSession = useCallback(async (finalScore?: number) => {
