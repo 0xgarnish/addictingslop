@@ -1,4 +1,5 @@
 import GameGrid from "@/components/GameGrid";
+import LiveGames from "@/components/LiveGames";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 
@@ -17,20 +18,28 @@ export default function Home() {
           </p>
         </section>
 
-        <section className="mb-8">
+        {/* Live Games Section */}
+        <section className="mb-12">
           <div className="flex items-center gap-4 mb-6">
-            <h3 className="text-xs text-[var(--accent-yellow)]">▶ HOT SLOP</h3>
-            <div className="flex-1 h-px bg-gradient-to-r from-[var(--accent-yellow)] to-transparent"></div>
-          </div>
-          <GameGrid category="hot" />
-        </section>
-
-        <section className="mb-8">
-          <div className="flex items-center gap-4 mb-6">
-            <h3 className="text-xs text-[var(--accent-green)]">▶ NEW DROPS</h3>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 bg-[var(--accent-green)] rounded-full animate-pulse"></span>
+              <h3 className="text-sm text-[var(--accent-green)] font-bold">LIVE SLOP</h3>
+            </div>
             <div className="flex-1 h-px bg-gradient-to-r from-[var(--accent-green)] to-transparent"></div>
           </div>
-          <GameGrid category="new" />
+          <LiveGames />
+        </section>
+
+        {/* Coming Soon Section */}
+        <section className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <h3 className="text-xs text-[var(--accent-yellow)]">▶ SLOPPING SOON</h3>
+            <div className="flex-1 h-px bg-gradient-to-r from-[var(--accent-yellow)] to-transparent"></div>
+          </div>
+          <p className="text-[10px] text-[var(--text-muted)] mb-4">
+            These games are cooking. Check back soon.
+          </p>
+          <GameGrid category="hot" />
         </section>
 
         <section className="mb-8">
